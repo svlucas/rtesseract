@@ -3,15 +3,38 @@ class RTesseract
   # Class to return formatted text from image
   class BoxText < Box
 
-    def to_plain_text
-      create_page_plain_text
+    def plain_text
+      @plain_text ||= read_text(plain_texter)
     end
 
-    def to_column_text
-      create_page_columns
+
+    def column_text
+      @column_text ||= read_text(column_texter)
     end
 
     private
+
+    def sorter
+      @sorter ||= Sorter.new
+    end
+
+    def plain_texter
+      @plain_texter ||= PlainText.new
+    end
+
+    def column_texter
+      @column_texter ||= ColumnText.new
+    end
+
+
+    def read_text(words, texter)
+      texter.read_words(sorter.sort_words_top_left(words))
+    end
+
+
+  end
+  # Class to sort words by orientation
+  class Sorter
 
     def sort_words_top_left
       words.sort { |w, w2| y_end_first(w,w2) < 0 ? y_end_first(w,w2) :
@@ -19,6 +42,8 @@ class RTesseract
                                    x_end_first(w,w2) < 0 ? x_end_first(w,w2) :
                                    x_start_after(w,w2) }
     end
+
+    private
 
     def y_end_first(w,w2)
       return has_values(w,w2) unless has_values(w,w2) > 1
@@ -46,13 +71,38 @@ class RTesseract
       2
     end
 
+  end
+  # Base class to create text
+  class BaseText
 
+    private
 
-    def create_page_plain_text
-      ordened_words = sort_words_top_left
-      previous_word = ordened_words.first
+    def spaces_fit(word, previous_word)
+      (distance_between_words(word, previous_word).to_f / space_size(word).to_f)
+    end
+
+    def distance_between_words(word, previous_word)
+      word[:x_start] - previous_word[:x_end]
+    end
+
+    def space_size(word)
+      (word[:x_end] - word[:x_start]) / word[:word].length
+    end
+
+  end
+  # Class to create plain text
+  class PlainText < BaseText
+
+    def read_words(words)
+      create_plain_text(words)
+    end
+
+    private
+
+    def create_plain_text(words)
+      previous_word = words.first
       text = ''
-      ordened_words.each do |word|
+      words.each do |word|
         text << add_to_plain_text(word, previous_word)
         previous_word = word
       end
@@ -80,13 +130,20 @@ class RTesseract
       space
     end
 
+  end
+  # Class to create text with column
+  class ColumnText < BaseText
 
+    def read_words(words)
+      create_columns(words)
+    end
 
-    def create_page_columns(words)
-      ordened_words = sort_words_top_left
-      previous_word = ordened_words.first
+    private
+
+    def create_columns(words)
+      previous_word = words.first
       text = ''
-      ordened_words.each do |word|
+      words.each do |word|
         text << add_to_columns(word, previous_word)
         previous_word = word
       end
@@ -116,19 +173,6 @@ class RTesseract
       end
     end
 
-
-
-    def spaces_fit(word, previous_word)
-      (distance_between_words(word, previous_word).to_f / space_size(word).to_f)
-    end
-
-    def distance_between_words(word, previous_word)
-      word[:x_start] - previous_word[:x_end]
-    end
-
-    def space_size(word)
-      (word[:x_end] - word[:x_start]) / word[:word].length
-    end
-
   end
+
 end
